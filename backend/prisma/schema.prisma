@@ -1,0 +1,140 @@
+// Prisma Schema for Collabia
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+
+  // Header Section
+  name      String   // Full name
+  username  String?  @unique // Username handle
+  avatar    String?  // Photo URL
+  location  String?  // Optional location
+  bio       String?  // Short bio (max 150 chars)
+  school    String?  // School/University
+
+  // Skills & Interests
+  skills    String[] // Things user knows
+  interests String[] // Things user wants to learn
+
+  // Collaboration Preferences
+  openToStudyPartner    Boolean @default(false)
+  openToProjects        Boolean @default(false)
+  openToAccountability  Boolean @default(false)
+  openToCofounder       Boolean @default(false)
+  openToHelpingOthers   Boolean @default(false)
+
+  // Activity Signals
+  lastActiveAt          DateTime @default(now())
+  collaborationsStarted Int      @default(0)
+
+  // School Verification
+  schoolVerified Boolean  @default(false)
+  schoolEmail    String?  // Educational email (.ac.ma, etc.)
+  verifiedAt     DateTime?
+
+  // Legacy field (keeping for backwards compatibility)
+  status    String?  @default("Available")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  posts         Post[]
+  interests_in  Interest[]
+  sentMessages  Message[]
+  conversations ConversationParticipant[]
+
+  @@map("users")
+}
+
+// Collab Post model
+model Post {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  tags        String[] // Skills/interests/study topics
+
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  interests Interest[]
+
+  @@map("posts")
+}
+
+// Interest model - tracks who clicked "Interested" on which post
+model Interest {
+  id        String   @id @default(uuid())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId]) // A user can only be interested in a post once
+  @@map("interests")
+}
+
+// Conversation model - represents a 1-1 chat between two users
+model Conversation {
+  id        String   @id @default(uuid())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@map("conversations")
+}
+
+// Junction table for conversation participants
+model ConversationParticipant {
+  id             String   @id @default(uuid())
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  joinedAt       DateTime @default(now())
+
+  @@unique([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+// Message model
+model Message {
+  id             String   @id @default(uuid())
+  content        String
+
+  senderId       String
+  sender         User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+
+  @@map("messages")
+}

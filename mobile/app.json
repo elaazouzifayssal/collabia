@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Collabia",
+    "slug": "collabia",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#6366f1"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.collabia.app"
+    },
+    "android": {
+      "package": "com.collabia.app",
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "scheme": "collabia"
+  }
+}
