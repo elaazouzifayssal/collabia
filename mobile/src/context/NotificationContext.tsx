@@ -2,21 +2,28 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { conversationService } from '../services/conversationService';
 import { postService } from '../services/postService';
+import { swipeService } from '../services/swipeService';
 
 interface NotificationContextType {
   unreadMessageCount: number;
+  interestsCount: number;
+  newMatchesCount: number;
   newPostIds: Set<string>;
   newInterestPostIds: Set<string>;
   refreshNotifications: () => Promise<void>;
   markPostAsSeen: (postId: string) => void;
   markInterestAsSeen: (postId: string) => void;
   clearMessageNotifications: () => void;
+  refreshInterestsCount: () => Promise<void>;
+  refreshNewMatchesCount: () => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [interestsCount, setInterestsCount] = useState(0);
+  const [newMatchesCount, setNewMatchesCount] = useState(0);
   const [newPostIds, setNewPostIds] = useState<Set<string>>(new Set());
   const [newInterestPostIds, setNewInterestPostIds] = useState<Set<string>>(new Set());
   const [lastSeenPosts, setLastSeenPosts] = useState<Date>(new Date());
@@ -43,11 +50,35 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   };
 
+  const refreshInterestsCount = useCallback(async () => {
+    try {
+      const count = await swipeService.getInterestsCount();
+      setInterestsCount(count);
+    } catch (error) {
+      console.error('Failed to refresh interests count:', error);
+    }
+  }, []);
+
+  const refreshNewMatchesCount = useCallback(async () => {
+    try {
+      const count = await swipeService.getNewMatchesCount();
+      setNewMatchesCount(count);
+    } catch (error) {
+      console.error('Failed to refresh new matches count:', error);
+    }
+  }, []);
+
   const refreshNotifications = useCallback(async () => {
     try {
       // Note: We don't track unread messages yet - would need backend support
       // For now, message count is always 0
       setUnreadMessageCount(0);
+
+      // Refresh interests count (people interested in me)
+      await refreshInterestsCount();
+
+      // Refresh new matches count (people who accepted my interest)
+      await refreshNewMatchesCount();
 
       // Get new posts (posts created after last seen)
       const posts = await postService.getPosts();
@@ -72,7 +103,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     } catch (error) {
       console.error('Failed to refresh notifications:', error);
     }
-  }, [lastSeenPosts, lastCheckedInterests]);
+  }, [lastSeenPosts, lastCheckedInterests, refreshInterestsCount, refreshNewMatchesCount]);
 
   const markPostAsSeen = useCallback(async (postId: string) => {
     setNewPostIds((prev) => {
@@ -116,12 +147,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     <NotificationContext.Provider
       value={{
         unreadMessageCount,
+        interestsCount,
+        newMatchesCount,
         newPostIds,
         newInterestPostIds,
         refreshNotifications,
         markPostAsSeen,
         markInterestAsSeen,
         clearMessageNotifications,
+        refreshInterestsCount,
+        refreshNewMatchesCount,
       }}
     >
       {children}

@@ -7,6 +7,7 @@ import usersRoutes from './routes/users';
 import postsRoutes from './routes/posts';
 import conversationsRoutes from './routes/conversations';
 import searchRoutes from './routes/search';
+import swipesRoutes from './routes/swipes';
 
 // Load environment variables
 dotenv.config();
@@ -25,6 +26,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/posts', postsRoutes);
 app.use('/api/conversations', conversationsRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/swipes', swipesRoutes);
 
 // Start server
 app.listen(PORT, () => {

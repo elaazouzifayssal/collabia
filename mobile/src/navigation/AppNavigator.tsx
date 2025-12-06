@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 
@@ -15,6 +16,7 @@ import RegisterScreen from '../screens/RegisterScreen';
 
 // Main Screens
 import HomeScreen from '../screens/HomeScreen';
+import SwipeScreen from '../screens/SwipeScreen';
 import CollabScreen from '../screens/CollabScreen';
 import CollaboratorProfileScreen from '../screens/CollaboratorProfileScreen';
 import DiscoverInterestUsersScreen from '../screens/DiscoverInterestUsersScreen';
@@ -30,6 +32,7 @@ import CreatePostScreen from '../screens/CreatePostScreen';
 import EditPostScreen from '../screens/EditPostScreen';
 import InterestedUsersScreen from '../screens/InterestedUsersScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import InterestedInYouScreen from '../screens/InterestedInYouScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -113,6 +116,40 @@ function ProfileStack() {
   );
 }
 
+function DiscoverStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="Swipe"
+        component={SwipeScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="CollaboratorProfile"
+        component={CollaboratorProfileScreen}
+        options={{ title: 'Profile' }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+function LikesStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="InterestedInYou"
+        component={InterestedInYouScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="CollaboratorProfile"
+        component={CollaboratorProfileScreen}
+        options={{ title: 'Profile' }}
+      />
+    </Stack.Navigator>
+  );
+}
+
 function CollabStack() {
   return (
     <Stack.Navigator>
@@ -157,28 +194,61 @@ function MessagesStack() {
 }
 
 function MainTabs() {
-  const { unreadMessageCount } = useNotifications();
+  const { unreadMessageCount, interestsCount } = useNotifications();
 
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarActiveTintColor: '#6366f1',
+        tabBarActiveTintColor: '#8b5cf6',
+        tabBarInactiveTintColor: '#9ca3af',
         tabBarStyle: {
           backgroundColor: '#ffffff',
           borderTopWidth: 1,
           borderTopColor: '#e5e7eb',
+          paddingTop: 8,
+        },
+        tabBarItemStyle: {
+          paddingBottom: 4,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
         },
       }}
     >
       <Tab.Screen
-        name="Home"
-        component={HomeStack}
-        options={{ headerShown: false, title: 'Home' }}
+        name="Collaborate"
+        component={DiscoverStack}
+        options={{
+          headerShown: false,
+          title: 'Collaborate',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="people" size={size} color={color} />
+          ),
+        }}
       />
       <Tab.Screen
-        name="Collab"
-        component={CollabStack}
-        options={{ headerShown: false, title: 'Collab' }}
+        name="Likes"
+        component={LikesStack}
+        options={{
+          headerShown: false,
+          title: 'Likes',
+          tabBarBadge: interestsCount > 0 ? interestsCount : undefined,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="heart" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Home"
+        component={HomeStack}
+        options={{
+          headerShown: false,
+          title: 'Home',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home" size={size} color={color} />
+          ),
+        }}
       />
       <Tab.Screen
         name="Messages"
@@ -187,12 +257,21 @@ function MainTabs() {
           headerShown: false,
           title: 'Messages',
           tabBarBadge: unreadMessageCount > 0 ? unreadMessageCount : undefined,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="chatbubbles" size={size} color={color} />
+          ),
         }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileStack}
-        options={{ headerShown: false, title: 'Profile' }}
+        options={{
+          headerShown: false,
+          title: 'Profile',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person" size={size} color={color} />
+          ),
+        }}
       />
     </Tab.Navigator>
   );

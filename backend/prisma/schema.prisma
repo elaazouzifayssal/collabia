@@ -138,3 +138,61 @@ model Message {
 
   @@map("messages")
 }
+
+// Swipe model - tracks swipe actions between users
+model Swipe {
+  id        String   @id @default(uuid())
+
+  swiperId  String   // User who swiped
+  swipedId  String   // User who was swiped on
+
+  direction String   // 'left', 'right', 'superlike'
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime? // For deny list expiration (30 days for left swipes)
+
+  @@unique([swiperId, swipedId])
+  @@index([swiperId])
+  @@index([swipedId])
+  @@map("swipes")
+}
+
+// SwipeInterest model - 2-step interest system
+// When A swipes right on B: status = 'pending' (A is interested in B)
+// When B accepts: status = 'mutual' (chat created)
+// When B declines: status = 'declined' (cleared)
+model SwipeInterest {
+  id           String   @id @default(uuid())
+
+  senderId     String   // User who swiped right (showed interest)
+  receiverId   String   // User who was swiped on
+
+  status       String   @default("pending") // 'pending', 'mutual', 'declined'
+  isSuperLike  Boolean  @default(false)
+  seenBySender Boolean  @default(false) // Has the sender seen that their interest was accepted?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  respondedAt  DateTime? // When receiver responded
+
+  @@unique([senderId, receiverId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([status])
+  @@map("swipe_interests")
+}
+
+// Match model - tracks mutual interests (for backwards compatibility)
+model Match {
+  id        String   @id @default(uuid())
+
+  user1Id   String
+  user2Id   String
+
+  createdAt DateTime @default(now())
+
+  @@unique([user1Id, user2Id])
+  @@index([user1Id])
+  @@index([user2Id])
+  @@map("matches")
+}
