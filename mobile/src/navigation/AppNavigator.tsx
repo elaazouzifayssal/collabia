@@ -28,11 +28,17 @@ import CollaborationPreferencesScreen from '../screens/CollaborationPreferencesS
 import SkillsInterestsScreen from '../screens/SkillsInterestsScreen';
 import SchoolVerificationScreen from '../screens/SchoolVerificationScreen';
 import StatusSettingsScreen from '../screens/StatusSettingsScreen';
+import EditInterestsScreen from '../screens/EditInterestsScreen';
 import CreatePostScreen from '../screens/CreatePostScreen';
 import EditPostScreen from '../screens/EditPostScreen';
 import InterestedUsersScreen from '../screens/InterestedUsersScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import InterestedInYouScreen from '../screens/InterestedInYouScreen';
+import InterestPostsScreen from '../screens/InterestPostsScreen';
+import BookDetailScreen from '../screens/BookDetailScreen';
+import InterestPostThreadScreen from '../screens/InterestPostThreadScreen';
+import CreateInterestPostScreen from '../screens/CreateInterestPostScreen';
+import InterestDetailScreen from '../screens/InterestDetailScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -112,6 +118,18 @@ function ProfileStack() {
         component={StatusSettingsScreen}
         options={{ title: 'Status' }}
       />
+      <Stack.Screen
+        name="EditInterests"
+        component={EditInterestsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="BookDetail"
+        component={BookDetailScreen}
+        options={({ route }: any) => ({
+          title: route.params?.book?.title || 'Book Details',
+        })}
+      />
     </Stack.Navigator>
   );
 }
@@ -128,6 +146,30 @@ function DiscoverStack() {
         name="CollaboratorProfile"
         component={CollaboratorProfileScreen}
         options={{ title: 'Profile' }}
+      />
+      <Stack.Screen
+        name="InterestPosts"
+        component={InterestPostsScreen}
+        options={({ route }: any) => ({
+          title: `Posts about ${route.params?.value || 'Interest'}`,
+        })}
+      />
+      <Stack.Screen
+        name="InterestPostThread"
+        component={InterestPostThreadScreen}
+        options={{ title: 'Post' }}
+      />
+      <Stack.Screen
+        name="CreateInterestPost"
+        component={CreateInterestPostScreen}
+        options={{ title: 'New Post' }}
+      />
+      <Stack.Screen
+        name="InterestDetail"
+        component={InterestDetailScreen}
+        options={({ route }: any) => ({
+          title: route.params?.value || 'Interest',
+        })}
       />
     </Stack.Navigator>
   );

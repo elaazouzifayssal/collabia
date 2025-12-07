@@ -697,121 +697,233 @@ router.post('/new-matches/mark-all-seen', authMiddleware, async (req: Request, r
 });
 
 // ============================================
-// SAME INTERESTS DISCOVERY ENDPOINTS
+// SAME INTERESTS DISCOVERY ENDPOINTS (V2 - Structured)
 // ============================================
 
-// GET /api/swipes/same-interests - Get users grouped by same interests (books, games, skills)
+// GET /api/swipes/same-interests - Get users grouped by same interests with structured data
 router.get('/same-interests', authMiddleware, async (req: Request, res: Response) => {
   try {
     const currentUserId = req.user!.userId;
 
-    // Get current user's interests
-    const currentUser = await prisma.user.findUnique({
-      where: { id: currentUserId },
-      select: {
-        currentBook: true,
-        currentGame: true,
-        currentSkill: true,
-      },
-    });
+    // Get current user's structured interests
+    const [currentUserBasic, currentBook, currentSkill, currentGame] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: currentUserId },
+        select: {
+          currentBook: true,  // Legacy field for backwards compatibility
+          currentGame: true,
+          currentSkill: true,
+        },
+      }),
+      prisma.currentBook.findUnique({ where: { userId: currentUserId } }),
+      prisma.currentSkill.findUnique({ where: { userId: currentUserId } }),
+      prisma.currentGame.findUnique({ where: { userId: currentUserId } }),
+    ]);
 
-    if (!currentUser) {
+    if (!currentUserBasic) {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Use structured data if available, otherwise fall back to legacy string fields
+    const bookTitle = currentBook?.title || currentUserBasic.currentBook;
+    const skillName = currentSkill?.name || currentUserBasic.currentSkill;
+    const gameName = currentGame?.name || currentUserBasic.currentGame;
+
     const result: {
-      sameBook: { value: string; users: any[] } | null;
-      sameGame: { value: string; users: any[] } | null;
-      sameSkill: { value: string; users: any[] } | null;
+      sameBook: {
+        value: string;
+        currentUserProgress?: { pagesRead: number; totalPages: number | null; status: string };
+        users: any[];
+      } | null;
+      sameGame: {
+        value: string;
+        currentUserData?: { rank: string | null; frequency: string | null };
+        users: any[];
+      } | null;
+      sameSkill: {
+        value: string;
+        currentUserData?: { level: string; notes: string | null };
+        users: any[];
+      } | null;
     } = {
       sameBook: null,
       sameGame: null,
       sameSkill: null,
     };
 
-    const userSelect = {
-      id: true,
-      name: true,
-      email: true,
-      location: true,
-      school: true,
-      bio: true,
-      interests: true,
-      skills: true,
-      currentBook: true,
-      currentGame: true,
-      currentSkill: true,
-      whatImBuilding: true,
-      lookingFor: true,
-      lastActiveAt: true,
-      schoolVerified: true,
-    };
-
-    // Find users with same book
-    if (currentUser.currentBook && currentUser.currentBook.trim() !== '') {
+    // Find users with same book (using structured data + legacy fallback)
+    if (bookTitle && bookTitle.trim() !== '') {
+      // Get users with matching structured book OR matching legacy field
       const sameBookUsers = await prisma.user.findMany({
         where: {
           id: { not: currentUserId },
-          currentBook: {
-            equals: currentUser.currentBook,
-            mode: 'insensitive',
-          },
+          OR: [
+            // Match structured book title
+            {
+              structuredBook: {
+                title: {
+                  equals: bookTitle,
+                  mode: 'insensitive',
+                },
+              },
+            },
+            // Match legacy field (for backwards compatibility)
+            {
+              currentBook: {
+                equals: bookTitle,
+                mode: 'insensitive',
+              },
+            },
+          ],
         },
-        select: userSelect,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          location: true,
+          school: true,
+          bio: true,
+          currentBook: true,
+          lastActiveAt: true,
+          schoolVerified: true,
+          structuredBook: true,
+        },
         take: 20,
         orderBy: { lastActiveAt: 'desc' },
       });
 
       if (sameBookUsers.length > 0) {
         result.sameBook = {
-          value: currentUser.currentBook,
-          users: sameBookUsers,
+          value: bookTitle,
+          currentUserProgress: currentBook ? {
+            pagesRead: currentBook.pagesRead,
+            totalPages: currentBook.totalPages,
+            status: currentBook.status,
+          } : undefined,
+          users: sameBookUsers.map(user => ({
+            ...user,
+            // Include structured progress if available
+            bookProgress: user.structuredBook ? {
+              pagesRead: user.structuredBook.pagesRead,
+              totalPages: user.structuredBook.totalPages,
+              status: user.structuredBook.status,
+              startDate: user.structuredBook.startDate,
+            } : null,
+          })),
         };
       }
     }
 
     // Find users with same game
-    if (currentUser.currentGame && currentUser.currentGame.trim() !== '') {
+    if (gameName && gameName.trim() !== '') {
       const sameGameUsers = await prisma.user.findMany({
         where: {
           id: { not: currentUserId },
-          currentGame: {
-            equals: currentUser.currentGame,
-            mode: 'insensitive',
-          },
+          OR: [
+            {
+              structuredGame: {
+                name: {
+                  equals: gameName,
+                  mode: 'insensitive',
+                },
+              },
+            },
+            {
+              currentGame: {
+                equals: gameName,
+                mode: 'insensitive',
+              },
+            },
+          ],
         },
-        select: userSelect,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          location: true,
+          school: true,
+          bio: true,
+          currentGame: true,
+          lastActiveAt: true,
+          schoolVerified: true,
+          structuredGame: true,
+        },
         take: 20,
         orderBy: { lastActiveAt: 'desc' },
       });
 
       if (sameGameUsers.length > 0) {
         result.sameGame = {
-          value: currentUser.currentGame,
-          users: sameGameUsers,
+          value: gameName,
+          currentUserData: currentGame ? {
+            rank: currentGame.rank,
+            frequency: currentGame.frequency,
+          } : undefined,
+          users: sameGameUsers.map(user => ({
+            ...user,
+            gameData: user.structuredGame ? {
+              rank: user.structuredGame.rank,
+              frequency: user.structuredGame.frequency,
+              startDate: user.structuredGame.startDate,
+            } : null,
+          })),
         };
       }
     }
 
-    // Find users with same skill they're learning
-    if (currentUser.currentSkill && currentUser.currentSkill.trim() !== '') {
+    // Find users with same skill
+    if (skillName && skillName.trim() !== '') {
       const sameSkillUsers = await prisma.user.findMany({
         where: {
           id: { not: currentUserId },
-          currentSkill: {
-            equals: currentUser.currentSkill,
-            mode: 'insensitive',
-          },
+          OR: [
+            {
+              structuredSkill: {
+                name: {
+                  equals: skillName,
+                  mode: 'insensitive',
+                },
+              },
+            },
+            {
+              currentSkill: {
+                equals: skillName,
+                mode: 'insensitive',
+              },
+            },
+          ],
         },
-        select: userSelect,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          location: true,
+          school: true,
+          bio: true,
+          currentSkill: true,
+          lastActiveAt: true,
+          schoolVerified: true,
+          structuredSkill: true,
+        },
         take: 20,
         orderBy: { lastActiveAt: 'desc' },
       });
 
       if (sameSkillUsers.length > 0) {
         result.sameSkill = {
-          value: currentUser.currentSkill,
-          users: sameSkillUsers,
+          value: skillName,
+          currentUserData: currentSkill ? {
+            level: currentSkill.level,
+            notes: currentSkill.notes,
+          } : undefined,
+          users: sameSkillUsers.map(user => ({
+            ...user,
+            skillData: user.structuredSkill ? {
+              level: user.structuredSkill.level,
+              notes: user.structuredSkill.notes,
+              startDate: user.structuredSkill.startDate,
+            } : null,
+          })),
         };
       }
     }

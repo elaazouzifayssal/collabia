@@ -13,7 +13,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/userService';
 import { conversationService } from '../services/conversationService';
+import { interestService, UserInterests } from '../services/interestService';
 import Avatar from '../components/Avatar';
+import {
+  CurrentBookCard,
+  CurrentSkillCard,
+  CurrentGameCard,
+  BookHistoryList,
+  SkillHistoryList,
+  GameHistoryList,
+} from '../components/interests';
 
 interface User {
   id: string;
@@ -39,11 +48,13 @@ export default function CollaboratorProfileScreen({ route, navigation }: any) {
   const { userId } = route.params;
   const { user: currentUser } = useAuth();
   const [collaborator, setCollaborator] = useState<User | null>(null);
+  const [userInterests, setUserInterests] = useState<UserInterests | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMessaging, setIsMessaging] = useState(false);
 
   useEffect(() => {
     loadCollaboratorProfile();
+    loadUserInterests();
   }, [userId]);
 
   const loadCollaboratorProfile = async () => {
@@ -57,6 +68,16 @@ export default function CollaboratorProfileScreen({ route, navigation }: any) {
       navigation.goBack();
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadUserInterests = async () => {
+    try {
+      const data = await interestService.getUserInterests(userId);
+      setUserInterests(data);
+    } catch (error) {
+      console.error('Failed to load user interests:', error);
+      // Don't show error - interests are optional
     }
   };
 
@@ -182,6 +203,24 @@ export default function CollaboratorProfileScreen({ route, navigation }: any) {
           )}
         </View>
 
+        {/* Current Interests Section */}
+        {userInterests && (userInterests.current.book || userInterests.current.skill || userInterests.current.game) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Currently Into</Text>
+            <View style={styles.interestsContainer}>
+              {userInterests.current.book && (
+                <CurrentBookCard book={userInterests.current.book} />
+              )}
+              {userInterests.current.skill && (
+                <CurrentSkillCard skill={userInterests.current.skill} />
+              )}
+              {userInterests.current.game && (
+                <CurrentGameCard game={userInterests.current.game} />
+              )}
+            </View>
+          </View>
+        )}
+
         {/* About Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>
@@ -242,6 +281,28 @@ export default function CollaboratorProfileScreen({ route, navigation }: any) {
                   </View>
                 </View>
               ))}
+            </View>
+          </View>
+        )}
+
+        {/* Interest History Section */}
+        {userInterests && (
+          userInterests.history.books.length > 0 ||
+          userInterests.history.skills.length > 0 ||
+          userInterests.history.games.length > 0
+        ) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Interest History</Text>
+            <View style={styles.historyContainer}>
+              {userInterests.history.books.length > 0 && (
+                <BookHistoryList books={userInterests.history.books} />
+              )}
+              {userInterests.history.skills.length > 0 && (
+                <SkillHistoryList skills={userInterests.history.skills} />
+              )}
+              {userInterests.history.games.length > 0 && (
+                <GameHistoryList games={userInterests.history.games} />
+              )}
             </View>
           </View>
         )}
@@ -364,6 +425,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
     marginBottom: 12,
+  },
+  interestsContainer: {
+    gap: 16,
+  },
+  historyContainer: {
+    gap: 12,
   },
   bioText: {
     fontSize: 15,

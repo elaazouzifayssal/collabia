@@ -8,38 +8,23 @@ import {
   Dimensions,
   TouchableOpacity,
   Alert,
-  ScrollView,
   ActivityIndicator,
   FlatList,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import SwipeCard from '../components/SwipeCard';
-import SameInterestCard from '../components/SameInterestCard';
-import InterestSectionHeader from '../components/InterestSectionHeader';
+import InterestPostCard from '../components/InterestPostCard';
 import { swipeService } from '../services/swipeService';
-
-// Gradient color presets for different interest types
-const INTEREST_GRADIENTS = {
-  book: ['#A06EFF', '#6C4DFF'] as const,
-  game: ['#FF6B9D', '#C44569'] as const,
-  skill: ['#00D9A5', '#00B388'] as const,
-};
+import {
+  interestPostService,
+  InterestPost,
+} from '../services/interestPostService';
 
 type DiscoveryMode = 'collaborate' | 'interests';
-
-interface SameInterestGroup {
-  value: string | null;
-  users: User[];
-}
-
-interface SameInterestsResult {
-  sameBook: SameInterestGroup | null;
-  sameGame: SameInterestGroup | null;
-  sameSkill: SameInterestGroup | null;
-}
 
 interface User {
   id: string;
@@ -55,7 +40,6 @@ interface User {
   openToHelpingOthers?: boolean;
   openToStudyPartner?: boolean;
   openToAccountability?: boolean;
-  // New discovery fields
   currentBook?: string;
   currentGame?: string;
   currentSkill?: string;
@@ -80,9 +64,18 @@ export default function SwipeScreen({ navigation }: any) {
   const [showInterestSent, setShowInterestSent] = useState(false);
   const [lastSwipedUser, setLastSwipedUser] = useState<User | null>(null);
 
-  // Same Interests mode state
-  const [sameInterests, setSameInterests] = useState<SameInterestsResult | null>(null);
-  const [isLoadingInterests, setIsLoadingInterests] = useState(false);
+  // Same Interests feed state
+  const [feedPosts, setFeedPosts] = useState<InterestPost[]>([]);
+  const [isLoadingFeed, setIsLoadingFeed] = useState(false);
+  const [hasLoadedFeed, setHasLoadedFeed] = useState(false);
+  const [isRefreshingFeed, setIsRefreshingFeed] = useState(false);
+  const [hasMorePosts, setHasMorePosts] = useState(true);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [myInterests, setMyInterests] = useState<{
+    book: string | null;
+    skill: string | null;
+    game: string | null;
+  } | null>(null);
 
   // Refs to hold current values for PanResponder
   const currentIndexRef = useRef(currentIndex);
@@ -131,21 +124,52 @@ export default function SwipeScreen({ navigation }: any) {
       if (mode === 'collaborate') {
         loadUsers();
         loadSwipeCount();
-      } else {
-        loadSameInterests();
+      } else if (!hasLoadedFeed) {
+        loadFeed();
       }
-    }, [mode])
+    }, [mode, hasLoadedFeed])
   );
 
-  const loadSameInterests = async () => {
+  const loadFeed = async (cursor?: string) => {
     try {
-      setIsLoadingInterests(true);
-      const data = await swipeService.getSameInterests();
-      setSameInterests(data);
+      if (!cursor) setIsLoadingFeed(true);
+      const data = await interestPostService.getFeed(20, cursor);
+
+      if (!cursor) {
+        setFeedPosts(data.posts);
+      } else {
+        setFeedPosts((prev) => [...prev, ...data.posts]);
+      }
+
+      setHasMorePosts(data.hasMore);
+      setNextCursor(data.nextCursor);
+      setMyInterests(data.myInterests);
+      setHasLoadedFeed(true);
     } catch (error) {
-      console.error('Failed to load same interests:', error);
+      console.error('Failed to load feed:', error);
     } finally {
-      setIsLoadingInterests(false);
+      setIsLoadingFeed(false);
+    }
+  };
+
+  const handleRefreshFeed = useCallback(async () => {
+    setIsRefreshingFeed(true);
+    try {
+      const data = await interestPostService.getFeed(20);
+      setFeedPosts(data.posts);
+      setHasMorePosts(data.hasMore);
+      setNextCursor(data.nextCursor);
+      setMyInterests(data.myInterests);
+    } catch (error) {
+      console.error('Failed to refresh feed:', error);
+    } finally {
+      setIsRefreshingFeed(false);
+    }
+  }, []);
+
+  const handleLoadMorePosts = () => {
+    if (!isLoadingFeed && hasMorePosts && nextCursor) {
+      loadFeed(nextCursor);
     }
   };
 
@@ -200,11 +224,9 @@ export default function SwipeScreen({ navigation }: any) {
     const swipeDirection = direction === 'up' ? 'superlike' : direction;
 
     swipeService.swipe(swipedUser.id, swipeDirection).then((result) => {
-      // Show interest sent notification for right/superlike swipes
       if (result.status === 'pending' && (direction === 'right' || direction === 'up')) {
         setLastSwipedUser(swipedUser);
         setShowInterestSent(true);
-        // Auto-hide after 2 seconds
         setTimeout(() => setShowInterestSent(false), 2000);
       }
     }).catch((error) => {
@@ -244,9 +266,7 @@ export default function SwipeScreen({ navigation }: any) {
   );
 
   const getUserLookingFor = (targetUser: User): 'cofounder' | 'team' | 'freelance' | 'learn' | null => {
-    // Prefer the new lookingFor field if it exists
     if (targetUser.lookingFor) return targetUser.lookingFor;
-    // Fallback to legacy boolean fields
     if (targetUser.openToCofounder) return 'cofounder';
     if (targetUser.openToProjects) return 'team';
     if (targetUser.openToHelpingOthers) return 'freelance';
@@ -254,152 +274,141 @@ export default function SwipeScreen({ navigation }: any) {
     return null;
   };
 
-  const handleUserPress = (user: User) => {
-    navigation.navigate('CollaboratorProfile', { userId: user.id });
+  const handlePostPress = (post: InterestPost) => {
+    navigation.navigate('InterestPostThread', { postId: post.id });
   };
 
-  // Premium Interest Section with horizontal FlatList
-  const renderPremiumInterestSection = (
-    type: 'book' | 'game' | 'skill',
-    title: string,
-    emoji: string,
-    value: string,
-    users: User[]
-  ) => {
-    if (!users || users.length === 0) return null;
-
-    const gradientColors = INTEREST_GRADIENTS[type];
-    const matchPrefix = type === 'book' ? 'Also reading' : type === 'game' ? 'Also playing' : 'Also learning';
-
-    return (
-      <View style={styles.premiumSection}>
-        {/* Gradient Header Card */}
-        <InterestSectionHeader
-          emoji={emoji}
-          title={title}
-          value={value}
-          count={users.length}
-          gradientColors={gradientColors}
-        />
-
-        {/* Horizontal User Cards */}
-        <FlatList
-          horizontal
-          data={users}
-          keyExtractor={(item) => item.id}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.premiumCardsContainer}
-          renderItem={({ item }) => (
-            <SameInterestCard
-              name={item.name}
-              email={item.email}
-              location={item.location}
-              matchLabel={`${matchPrefix} ${value}`}
-              gradientColors={gradientColors}
-              onPress={() => handleUserPress(item)}
-            />
-          )}
-        />
-      </View>
-    );
+  const handleInterestPress = (type: 'book' | 'skill' | 'game', value: string) => {
+    navigation.navigate('InterestDetail', { type, value });
   };
+
+  const handleLike = async (postId: string) => {
+    try {
+      const result = await interestPostService.toggleLike(postId);
+      setFeedPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? { ...p, isLiked: result.isLiked, likeCount: result.likeCount }
+            : p
+        )
+      );
+    } catch (error) {
+      console.error('Failed to toggle like:', error);
+    }
+  };
+
+  const renderFeedPost = ({ item }: { item: InterestPost }) => (
+    <InterestPostCard
+      post={item}
+      onPress={() => handlePostPress(item)}
+      onLike={() => handleLike(item.id)}
+      onComment={() => handlePostPress(item)}
+      onInterestPress={() => handleInterestPress(item.type, item.interestValue)}
+      showInterestPill={true}
+    />
+  );
 
   const renderSameInterestsMode = () => {
-    if (isLoadingInterests) {
+    if (isLoadingFeed) {
       return (
-        <View style={styles.premiumLoadingContainer}>
+        <View style={styles.feedLoadingContainer}>
           <LinearGradient
             colors={['#A06EFF', '#6C4DFF']}
             style={styles.loadingGradient}
           >
             <ActivityIndicator size="large" color="#fff" />
           </LinearGradient>
-          <Text style={styles.premiumLoadingText}>Finding your people...</Text>
-          <Text style={styles.premiumLoadingSubtext}>
-            Matching interests, books & games
+          <Text style={styles.feedLoadingText}>Loading your feed...</Text>
+          <Text style={styles.feedLoadingSubtext}>
+            Posts from your shared interests
           </Text>
         </View>
       );
     }
 
-    const hasAnyInterests =
-      sameInterests?.sameBook?.users?.length ||
-      sameInterests?.sameGame?.users?.length ||
-      sameInterests?.sameSkill?.users?.length;
+    const hasAnyInterests = myInterests?.book || myInterests?.skill || myInterests?.game;
 
     if (!hasAnyInterests) {
       return (
-        <View style={styles.premiumEmptyContainer}>
-          {/* Empty state with gradient icon background */}
+        <View style={styles.feedEmptyContainer}>
           <LinearGradient
             colors={['#A06EFF', '#6C4DFF']}
             style={styles.emptyIconGradient}
           >
             <Ionicons name="sparkles" size={48} color="#fff" />
           </LinearGradient>
-          <Text style={styles.premiumEmptyTitle}>No matches yet</Text>
-          <Text style={styles.premiumEmptyText}>
-            Share what you're reading, playing, or learning to discover like-minded people
+          <Text style={styles.feedEmptyTitle}>No interests yet</Text>
+          <Text style={styles.feedEmptyText}>
+            Add what you're reading, playing, or learning to see posts from people with similar interests
           </Text>
           <TouchableOpacity
-            style={styles.premiumEditButton}
-            onPress={() => navigation.navigate('Profile', { screen: 'EditProfile' })}
+            style={styles.feedEditButton}
+            onPress={() => navigation.navigate('Profile', { screen: 'EditInterests' })}
             activeOpacity={0.9}
           >
             <LinearGradient
               colors={['#A06EFF', '#6C4DFF']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={styles.premiumEditButtonGradient}
+              style={styles.feedEditButtonGradient}
             >
               <Ionicons name="pencil" size={18} color="#fff" />
-              <Text style={styles.premiumEditButtonText}>Complete Your Profile</Text>
+              <Text style={styles.feedEditButtonText}>Add Your Interests</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
       );
     }
 
-    return (
-      <ScrollView
-        style={styles.premiumScrollView}
-        contentContainerStyle={styles.premiumScrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header intro text */}
-        <View style={styles.premiumIntroContainer}>
-          <Text style={styles.premiumIntroTitle}>Your Tribe</Text>
-          <Text style={styles.premiumIntroSubtitle}>
-            People who share your current interests
+    if (feedPosts.length === 0) {
+      return (
+        <View style={styles.feedEmptyContainer}>
+          <LinearGradient
+            colors={['#A06EFF', '#6C4DFF']}
+            style={styles.emptyIconGradient}
+          >
+            <Ionicons name="chatbubbles-outline" size={48} color="#fff" />
+          </LinearGradient>
+          <Text style={styles.feedEmptyTitle}>No posts yet</Text>
+          <Text style={styles.feedEmptyText}>
+            Be the first to share your thoughts about your interests!
           </Text>
         </View>
+      );
+    }
 
-        {/* Interest Sections */}
-        {sameInterests?.sameBook && renderPremiumInterestSection(
-          'book',
-          'READING THE SAME BOOK',
-          '📚',
-          sameInterests.sameBook.value || '',
-          sameInterests.sameBook.users
-        )}
-        {sameInterests?.sameGame && renderPremiumInterestSection(
-          'game',
-          'PLAYING THE SAME GAME',
-          '🎮',
-          sameInterests.sameGame.value || '',
-          sameInterests.sameGame.users
-        )}
-        {sameInterests?.sameSkill && renderPremiumInterestSection(
-          'skill',
-          'LEARNING THE SAME SKILL',
-          '🎯',
-          sameInterests.sameSkill.value || '',
-          sameInterests.sameSkill.users
-        )}
-
-        {/* Bottom spacing */}
-        <View style={{ height: 40 }} />
-      </ScrollView>
+    return (
+      <FlatList
+        data={feedPosts}
+        keyExtractor={(item) => item.id}
+        renderItem={renderFeedPost}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.feedListContent}
+        onEndReached={handleLoadMorePosts}
+        onEndReachedThreshold={0.5}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshingFeed}
+            onRefresh={handleRefreshFeed}
+            tintColor="#A06EFF"
+          />
+        }
+        ListHeaderComponent={
+          <View style={styles.feedHeader}>
+            <Text style={styles.feedHeaderTitle}>Your Feed</Text>
+            <Text style={styles.feedHeaderSubtitle}>
+              Posts from people who share your interests
+            </Text>
+          </View>
+        }
+        ListFooterComponent={
+          hasMorePosts ? (
+            <View style={styles.feedFooter}>
+              <ActivityIndicator size="small" color="#A06EFF" />
+            </View>
+          ) : null
+        }
+      />
     );
   };
 
@@ -455,7 +464,6 @@ export default function SwipeScreen({ navigation }: any) {
             ]}
             {...(isFirst ? panResponder.panHandlers : {})}
           >
-            {/* COLLAB overlay */}
             {isFirst && (
               <Animated.View
                 style={[styles.likeOverlay, { opacity: likeOpacity }]}
@@ -464,7 +472,6 @@ export default function SwipeScreen({ navigation }: any) {
               </Animated.View>
             )}
 
-            {/* PASS overlay */}
             {isFirst && (
               <Animated.View
                 style={[styles.nopeOverlay, { opacity: nopeOpacity }]}
@@ -541,10 +548,8 @@ export default function SwipeScreen({ navigation }: any) {
       {/* Content based on mode */}
       {mode === 'collaborate' ? (
         <>
-          {/* Cards */}
           <View style={styles.cardsContainer}>{renderCards()}</View>
 
-          {/* Action Buttons */}
           {currentIndex < users.length && !isLoading && (
             <View style={styles.buttonsContainer}>
               <TouchableOpacity
@@ -571,7 +576,6 @@ export default function SwipeScreen({ navigation }: any) {
             </View>
           )}
 
-          {/* Interest Sent Toast */}
           {showInterestSent && lastSwipedUser && (
             <View style={styles.interestSentToast}>
               <View style={styles.toastContent}>
@@ -777,7 +781,6 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginTop: 2,
   },
-  // Toggle styles
   toggleContainer: {
     flexDirection: 'row',
     marginHorizontal: 20,
@@ -806,48 +809,8 @@ const styles = StyleSheet.create({
   toggleTextActive: {
     color: '#fff',
   },
-  // ============================================
-  // PREMIUM SAME INTERESTS MODE STYLES
-  // ============================================
-
-  // Premium Scroll View
-  premiumScrollView: {
-    flex: 1,
-  },
-  premiumScrollContent: {
-    paddingBottom: 32,
-  },
-
-  // Premium Intro Header
-  premiumIntroContainer: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 24,
-  },
-  premiumIntroTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#1f2937',
-    marginBottom: 6,
-  },
-  premiumIntroSubtitle: {
-    fontSize: 15,
-    color: '#6b7280',
-    lineHeight: 22,
-  },
-
-  // Premium Section
-  premiumSection: {
-    marginBottom: 32,
-  },
-  premiumCardsContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 4,
-    paddingBottom: 8,
-  },
-
-  // Premium Loading State
-  premiumLoadingContainer: {
+  // Feed styles
+  feedLoadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -866,20 +829,18 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 12,
   },
-  premiumLoadingText: {
+  feedLoadingText: {
     fontSize: 22,
     fontWeight: '700',
     color: '#1f2937',
     marginBottom: 8,
   },
-  premiumLoadingSubtext: {
+  feedLoadingSubtext: {
     fontSize: 15,
     color: '#9ca3af',
     textAlign: 'center',
   },
-
-  // Premium Empty State
-  premiumEmptyContainer: {
+  feedEmptyContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -898,21 +859,21 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 15,
   },
-  premiumEmptyTitle: {
+  feedEmptyTitle: {
     fontSize: 26,
     fontWeight: '800',
     color: '#1f2937',
     marginBottom: 12,
     textAlign: 'center',
   },
-  premiumEmptyText: {
+  feedEmptyText: {
     fontSize: 16,
     color: '#6b7280',
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 32,
   },
-  premiumEditButton: {
+  feedEditButton: {
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#6C4DFF',
@@ -921,16 +882,38 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-  premiumEditButtonGradient: {
+  feedEditButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 28,
     paddingVertical: 16,
     gap: 10,
   },
-  premiumEditButtonText: {
+  feedEditButtonText: {
     fontSize: 16,
     fontWeight: '700',
     color: '#fff',
+  },
+  feedListContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+  },
+  feedHeader: {
+    paddingVertical: 16,
+    paddingHorizontal: 4,
+  },
+  feedHeaderTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  feedHeaderSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  feedFooter: {
+    paddingVertical: 20,
+    alignItems: 'center',
   },
 });

@@ -147,7 +147,7 @@ export default function CreatePostScreen({ navigation }: any) {
 
         {showTemplates ? (
           <>
-            <Text style={styles.templatesTitle}>⚡ Quick Start Templates</Text>
+            <Text style={styles.templatesTitle}>Quick Start Templates</Text>
             <Text style={styles.templatesSubtitle}>
               Choose a template to get started faster
             </Text>
@@ -171,7 +171,7 @@ export default function CreatePostScreen({ navigation }: any) {
               onPress={handleStartFromScratch}
             >
               <Text style={styles.startFromScratchText}>
-                ✏️ Start from scratch
+                Start from scratch
               </Text>
             </TouchableOpacity>
           </>
@@ -181,7 +181,7 @@ export default function CreatePostScreen({ navigation }: any) {
               style={styles.backToTemplatesButton}
               onPress={() => setShowTemplates(true)}
             >
-              <Text style={styles.backToTemplatesText}>← Use template</Text>
+              <Text style={styles.backToTemplatesText}>Use template</Text>
             </TouchableOpacity>
 
             <Text style={styles.label}>Title *</Text>
@@ -217,10 +217,10 @@ export default function CreatePostScreen({ navigation }: any) {
             />
 
             <View style={styles.examples}>
-              <Text style={styles.examplesTitle}>💡 Examples:</Text>
-              <Text style={styles.exampleText}>• "Need study partner for Analyse S1"</Text>
-              <Text style={styles.exampleText}>• "Looking for co-founder to build SaaS"</Text>
-              <Text style={styles.exampleText}>• "Want accountability buddy for learning AI"</Text>
+              <Text style={styles.examplesTitle}>Examples:</Text>
+              <Text style={styles.exampleText}>- "Need study partner for Analyse S1"</Text>
+              <Text style={styles.exampleText}>- "Looking for co-founder to build SaaS"</Text>
+              <Text style={styles.exampleText}>- "Want accountability buddy for learning AI"</Text>
             </View>
 
             <TouchableOpacity

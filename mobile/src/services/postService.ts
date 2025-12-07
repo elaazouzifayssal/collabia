@@ -12,6 +12,25 @@ interface UpdatePostData {
   tags: string[];
 }
 
+export interface Post {
+  id: string;
+  title: string;
+  description: string | null;
+  tags: string[];
+  authorId: string;
+  createdAt: string;
+  updatedAt: string;
+  author: {
+    id: string;
+    name: string;
+    email: string;
+    avatar: string | null;
+    school: string | null;
+    status: string | null;
+  };
+  interests: Array<{ id: string; userId: string }>;
+}
+
 export const postService = {
   // Get all posts (feed)
   getPosts: async () => {

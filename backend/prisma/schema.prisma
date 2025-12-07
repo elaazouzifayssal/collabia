@@ -62,6 +62,19 @@ model User {
   sentMessages  Message[]
   conversations ConversationParticipant[]
 
+  // Structured interests relations
+  structuredBook    CurrentBook?
+  structuredSkill   CurrentSkill?
+  structuredGame    CurrentGame?
+  bookHistory       BookHistory[]
+  skillHistory      SkillHistory[]
+  gameHistory       GameHistory[]
+
+  // Interest posts relations (separate from collab posts)
+  interestPosts     InterestPost[]
+  interestComments  InterestComment[]
+  interestLikes     InterestLike[]
+
   @@map("users")
 }
 
@@ -75,12 +88,21 @@ model Post {
   authorId    String
   author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
+  // Optional interest associations
+  // Posts can be linked to a specific book, skill, or game
+  interestType    String?  // 'book' | 'skill' | 'game' | null
+  interestValue   String?  // The title/name of the interest (e.g., "Zero to One")
+
+  // Progress snapshot at time of posting (for books)
+  progressSnapshot Int?    // Pages read when post was created
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
   interests Interest[]
 
+  @@index([interestType, interestValue])
   @@map("posts")
 }
 
@@ -202,4 +224,171 @@ model Match {
   @@index([user1Id])
   @@index([user2Id])
   @@map("matches")
+}
+
+// ============================================
+// STRUCTURED INTERESTS WITH HISTORY TRACKING
+// ============================================
+
+// CurrentBook - Structured book tracking with progress
+model CurrentBook {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  totalPages  Int?
+  pagesRead   Int      @default(0)
+  status      String   @default("reading") // reading | paused | completed
+  startDate   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("current_books")
+}
+
+// CurrentSkill - Structured skill tracking with levels
+model CurrentSkill {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String
+  level     String   @default("beginner") // beginner | intermediate | advanced
+  notes     String?
+  startDate DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("current_skills")
+}
+
+// CurrentGame - Structured game tracking
+model CurrentGame {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String
+  rank      String?
+  frequency String?  // daily | weekly | occasionally
+  startDate DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("current_games")
+}
+
+// BookHistory - Completed/paused books archive
+model BookHistory {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  totalPages  Int?
+  pagesRead   Int?
+  status      String    // completed | paused
+  rating      Int?      // 1-5 stars (for completed)
+  startedAt   DateTime
+  finishedAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@map("book_history")
+}
+
+// SkillHistory - Past skills learned
+model SkillHistory {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name         String
+  levelReached String   // beginner | intermediate | advanced
+  notes        String?
+  startedAt    DateTime
+  completedAt  DateTime @default(now())
+
+  @@index([userId])
+  @@map("skill_history")
+}
+
+// GameHistory - Past games played
+model GameHistory {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name       String
+  rank       String?
+  playedFrom DateTime
+  playedTo   DateTime @default(now())
+
+  @@index([userId])
+  @@map("game_history")
+}
+
+// ============================================
+// INTEREST POSTS SYSTEM (Separate from Collab Posts)
+// ============================================
+
+// InterestPost - Posts within interest communities (book clubs, skill learning, gaming)
+model InterestPost {
+  id        String   @id @default(uuid())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Interest type and value (matched by name, not ID for flexibility)
+  type      String   // 'book' | 'skill' | 'game'
+  interestValue String // The book title, skill name, or game name
+
+  // For books: capture reading progress at time of posting
+  progressSnapshot Int?
+
+  content   String   // The post content (text)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  comments  InterestComment[]
+  likes     InterestLike[]
+
+  @@index([type, interestValue])
+  @@index([userId])
+  @@map("interest_posts")
+}
+
+// InterestComment - Comments on interest posts
+model InterestComment {
+  id        String   @id @default(uuid())
+
+  postId    String
+  post      InterestPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  content   String
+
+  createdAt DateTime @default(now())
+
+  @@index([postId])
+  @@index([userId])
+  @@map("interest_comments")
+}
+
+// InterestLike - Likes on interest posts
+model InterestLike {
+  id        String   @id @default(uuid())
+
+  postId    String
+  post      InterestPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId]) // User can only like a post once
+  @@index([postId])
+  @@map("interest_likes")
 }

@@ -8,6 +8,8 @@ import postsRoutes from './routes/posts';
 import conversationsRoutes from './routes/conversations';
 import searchRoutes from './routes/search';
 import swipesRoutes from './routes/swipes';
+import interestsRoutes from './routes/interests';
+import interestPostsRoutes from './routes/interestPosts';
 
 // Load environment variables
 dotenv.config();
@@ -27,6 +29,8 @@ app.use('/api/posts', postsRoutes);
 app.use('/api/conversations', conversationsRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/swipes', swipesRoutes);
+app.use('/api/interests', interestsRoutes);
+app.use('/api/interest-posts', interestPostsRoutes);
 
 // Start server
 app.listen(PORT, () => {

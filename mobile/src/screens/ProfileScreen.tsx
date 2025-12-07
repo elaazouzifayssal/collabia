@@ -1,11 +1,61 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, RefreshControl } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/Avatar';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  CurrentBookCard,
+  CurrentSkillCard,
+  CurrentGameCard,
+  BookHistoryList,
+  SkillHistoryList,
+  GameHistoryList,
+} from '../components/interests';
+import {
+  interestService,
+  CurrentInterests,
+  InterestHistory,
+} from '../services/interestService';
+import UserInterestPosts from '../components/UserInterestPosts';
+import { InterestPost } from '../services/interestPostService';
+
+const INTEREST_GRADIENTS = {
+  book: ['#A06EFF', '#6C4DFF'] as const,
+  game: ['#FF6B9D', '#C44569'] as const,
+  skill: ['#00D9A5', '#00B388'] as const,
+};
 
 export default function ProfileScreen({ navigation }: any) {
   const { user, logout } = useAuth();
+  const [currentInterests, setCurrentInterests] = useState<CurrentInterests | null>(null);
+  const [history, setHistory] = useState<InterestHistory | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchInterests = useCallback(async () => {
+    try {
+      const [interestsData, historyData] = await Promise.all([
+        interestService.getCurrentInterests(),
+        interestService.getHistory(10),
+      ]);
+      setCurrentInterests(interestsData);
+      setHistory(historyData);
+    } catch (error) {
+      console.error('Error fetching interests:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchInterests();
+  }, [fetchInterests]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchInterests();
+  }, [fetchInterests]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -22,6 +72,42 @@ export default function ProfileScreen({ navigation }: any) {
         },
       ]
     );
+  };
+
+  const handleEditInterests = () => {
+    navigation.navigate('EditInterests');
+  };
+
+  const handleBookPress = (book: {
+    title: string;
+    pagesRead?: number;
+    totalPages?: number | null;
+    status?: 'reading' | 'paused' | 'completed';
+    isHistory?: boolean;
+    rating?: number | null;
+  }) => {
+    navigation.navigate('BookDetail', { book });
+  };
+
+  const handleInterestPostPress = (post: InterestPost) => {
+    navigation.navigate('Collaborate', {
+      screen: 'InterestPostThread',
+      params: { postId: post.id },
+    });
+  };
+
+  const handleViewAllPosts = (type: 'book' | 'skill' | 'game', value: string) => {
+    navigation.navigate('Collaborate', {
+      screen: 'InterestPosts',
+      params: { type, value },
+    });
+  };
+
+  const handleCreateInterestPost = (type: 'book' | 'skill' | 'game', value: string, progress?: number) => {
+    navigation.navigate('Collaborate', {
+      screen: 'CreateInterestPost',
+      params: { type, value, currentProgress: progress },
+    });
   };
 
   const settingsItems = [
@@ -111,8 +197,28 @@ export default function ProfileScreen({ navigation }: any) {
     </TouchableOpacity>
   );
 
+  const hasStructuredInterests =
+    currentInterests?.currentBook ||
+    currentInterests?.currentSkill ||
+    currentInterests?.currentGame;
+
+  const hasLegacyInterests =
+    !hasStructuredInterests &&
+    (user?.currentBook || user?.currentGame || user?.currentSkill || user?.whatImBuilding);
+
+  const hasHistory =
+    history &&
+    (history.bookHistory.length > 0 ||
+      history.skillHistory.length > 0 ||
+      history.gameHistory.length > 0);
+
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366f1" />
+      }
+    >
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Profile</Text>
@@ -136,10 +242,119 @@ export default function ProfileScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* Now Section - What I'm Currently Into */}
-      {(user?.currentBook || user?.currentGame || user?.currentSkill || user?.whatImBuilding) && (
+      {/* Current Interests Section - Structured */}
+      {hasStructuredInterests && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>NOW</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>NOW</Text>
+            <TouchableOpacity onPress={handleEditInterests}>
+              <Text style={styles.editLink}>Edit</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.interestsContainer}>
+            {currentInterests?.currentBook && (
+              <CurrentBookCard
+                book={currentInterests.currentBook}
+                onEdit={handleEditInterests}
+                onPress={() => handleBookPress({
+                  title: currentInterests.currentBook!.title,
+                  pagesRead: currentInterests.currentBook!.pagesRead,
+                  totalPages: currentInterests.currentBook!.totalPages,
+                  status: currentInterests.currentBook!.status,
+                })}
+              />
+            )}
+            {currentInterests?.currentSkill && (
+              <CurrentSkillCard
+                skill={currentInterests.currentSkill}
+                onEdit={handleEditInterests}
+              />
+            )}
+            {currentInterests?.currentGame && (
+              <CurrentGameCard
+                game={currentInterests.currentGame}
+                onEdit={handleEditInterests}
+              />
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* My Interest Posts Section */}
+      {hasStructuredInterests && user && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>MY POSTS</Text>
+          <View style={styles.postsContainer}>
+            {currentInterests?.currentBook && (
+              <View style={styles.postsSectionCard}>
+                <View style={styles.postsSectionHeader}>
+                  <Text style={styles.postsSectionEmoji}>📚</Text>
+                  <Text style={styles.postsSectionTitle} numberOfLines={1}>
+                    {currentInterests.currentBook.title}
+                  </Text>
+                </View>
+                <UserInterestPosts
+                  userId={user.id}
+                  type="book"
+                  interestValue={currentInterests.currentBook.title}
+                  gradientColors={INTEREST_GRADIENTS.book}
+                  onPostPress={handleInterestPostPress}
+                  onViewAll={() => handleViewAllPosts('book', currentInterests.currentBook!.title)}
+                  onCreatePost={() => handleCreateInterestPost('book', currentInterests.currentBook!.title, currentInterests.currentBook!.pagesRead)}
+                />
+              </View>
+            )}
+            {currentInterests?.currentSkill && (
+              <View style={styles.postsSectionCard}>
+                <View style={styles.postsSectionHeader}>
+                  <Text style={styles.postsSectionEmoji}>🎯</Text>
+                  <Text style={styles.postsSectionTitle} numberOfLines={1}>
+                    {currentInterests.currentSkill.name}
+                  </Text>
+                </View>
+                <UserInterestPosts
+                  userId={user.id}
+                  type="skill"
+                  interestValue={currentInterests.currentSkill.name}
+                  gradientColors={INTEREST_GRADIENTS.skill}
+                  onPostPress={handleInterestPostPress}
+                  onViewAll={() => handleViewAllPosts('skill', currentInterests.currentSkill!.name)}
+                  onCreatePost={() => handleCreateInterestPost('skill', currentInterests.currentSkill!.name)}
+                />
+              </View>
+            )}
+            {currentInterests?.currentGame && (
+              <View style={styles.postsSectionCard}>
+                <View style={styles.postsSectionHeader}>
+                  <Text style={styles.postsSectionEmoji}>🎮</Text>
+                  <Text style={styles.postsSectionTitle} numberOfLines={1}>
+                    {currentInterests.currentGame.name}
+                  </Text>
+                </View>
+                <UserInterestPosts
+                  userId={user.id}
+                  type="game"
+                  interestValue={currentInterests.currentGame.name}
+                  gradientColors={INTEREST_GRADIENTS.game}
+                  onPostPress={handleInterestPostPress}
+                  onViewAll={() => handleViewAllPosts('game', currentInterests.currentGame!.name)}
+                  onCreatePost={() => handleCreateInterestPost('game', currentInterests.currentGame!.name)}
+                />
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* Legacy Now Section - Fallback for non-structured data */}
+      {hasLegacyInterests && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>NOW</Text>
+            <TouchableOpacity onPress={handleEditInterests}>
+              <Text style={styles.editLink}>Upgrade</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.nowCard}>
             {user?.currentBook && (
               <View style={styles.nowItem}>
@@ -185,6 +400,62 @@ export default function ProfileScreen({ navigation }: any) {
                 </View>
               </View>
             )}
+          </View>
+        </View>
+      )}
+
+      {/* No Interests - Add prompt */}
+      {!hasStructuredInterests && !hasLegacyInterests && !loading && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>NOW</Text>
+          <TouchableOpacity style={styles.emptyInterestsCard} onPress={handleEditInterests}>
+            <Ionicons name="add-circle-outline" size={32} color="#6366f1" />
+            <Text style={styles.emptyInterestsText}>Add what you're currently into</Text>
+            <Text style={styles.emptyInterestsSubtext}>
+              Share what you're reading, learning, or playing
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* History Section */}
+      {hasHistory && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>HISTORY</Text>
+          <View style={styles.historyContainer}>
+            {history.bookHistory.length > 0 && (
+              <BookHistoryList
+                books={history.bookHistory}
+                onBookPress={(book) => handleBookPress({
+                  title: book.title,
+                  pagesRead: book.pagesRead || undefined,
+                  totalPages: book.totalPages,
+                  status: book.status,
+                  isHistory: true,
+                  rating: book.rating,
+                })}
+              />
+            )}
+            {history.skillHistory.length > 0 && (
+              <SkillHistoryList skills={history.skillHistory} />
+            )}
+            {history.gameHistory.length > 0 && (
+              <GameHistoryList games={history.gameHistory} />
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* What I'm Building - if exists */}
+      {user?.whatImBuilding && hasStructuredInterests && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>BUILDING</Text>
+          <View style={styles.buildingCard}>
+            <Text style={styles.buildingEmoji}>🚀</Text>
+            <View style={styles.buildingContent}>
+              <Text style={styles.buildingLabel}>Current Project</Text>
+              <Text style={styles.buildingValue}>{user.whatImBuilding}</Text>
+            </View>
           </View>
         </View>
       )}
@@ -314,6 +585,13 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 20,
+    marginBottom: 8,
+  },
   sectionTitle: {
     fontSize: 12,
     fontWeight: '600',
@@ -321,6 +599,19 @@ const styles = StyleSheet.create({
     marginLeft: 20,
     marginBottom: 8,
     letterSpacing: 0.5,
+  },
+  editLink: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6366f1',
+  },
+  interestsContainer: {
+    marginHorizontal: 20,
+    gap: 16,
+  },
+  historyContainer: {
+    marginHorizontal: 20,
+    gap: 12,
   },
   settingsCard: {
     backgroundColor: '#fff',
@@ -437,5 +728,91 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#111827',
     fontWeight: '600',
+  },
+  // Empty interests
+  emptyInterestsCard: {
+    backgroundColor: '#fff',
+    marginHorizontal: 20,
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#e5e7eb',
+  },
+  emptyInterestsText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginTop: 12,
+  },
+  emptyInterestsSubtext: {
+    fontSize: 13,
+    color: '#9ca3af',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  // Building card
+  buildingCard: {
+    backgroundColor: '#fff',
+    marginHorizontal: 20,
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  buildingEmoji: {
+    fontSize: 32,
+    marginRight: 14,
+  },
+  buildingContent: {
+    flex: 1,
+  },
+  buildingLabel: {
+    fontSize: 12,
+    color: '#9ca3af',
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  buildingValue: {
+    fontSize: 15,
+    color: '#111827',
+    fontWeight: '600',
+  },
+  // Posts section styles
+  postsContainer: {
+    marginHorizontal: 20,
+    gap: 16,
+  },
+  postsSectionCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  postsSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  postsSectionEmoji: {
+    fontSize: 20,
+  },
+  postsSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    flex: 1,
   },
 });

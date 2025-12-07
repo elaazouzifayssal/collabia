@@ -4,7 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // IMPORTANT: Change this to your computer's local IP address
 // Find it by running: ifconfig (Mac/Linux) or ipconfig (Windows)
-const API_URL = "http://192.168.11.251:3000";
+const API_URL = "http://192.168.11.129:3000";
 
 // Create axios instance
 const api = axios.create({

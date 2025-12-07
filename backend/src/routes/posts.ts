@@ -122,10 +122,115 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/posts/by-interest/:type/:value - Get posts by interest type and value
+router.get('/by-interest/:type/:value', async (req: Request, res: Response) => {
+  try {
+    const { type, value } = req.params;
+    const limit = parseInt(req.query.limit as string) || 10;
+
+    // Validate type
+    if (!['book', 'skill', 'game'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid interest type. Must be book, skill, or game' });
+    }
+
+    const posts = await prisma.post.findMany({
+      where: {
+        interestType: type,
+        interestValue: {
+          equals: decodeURIComponent(value),
+          mode: 'insensitive',
+        },
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+            school: true,
+            status: true,
+            structuredBook: type === 'book' ? {
+              select: {
+                pagesRead: true,
+                totalPages: true,
+                status: true,
+              },
+            } : false,
+          },
+        },
+        interests: {
+          select: {
+            id: true,
+            userId: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: limit,
+    });
+
+    res.json({ posts });
+  } catch (error) {
+    console.error('Get posts by interest error:', error);
+    res.status(500).json({ error: 'Failed to get posts' });
+  }
+});
+
+// GET /api/posts/user/:userId/by-interest/:type/:value - Get a user's posts about a specific interest
+router.get('/user/:userId/by-interest/:type/:value', async (req: Request, res: Response) => {
+  try {
+    const { userId, type, value } = req.params;
+
+    // Validate type
+    if (!['book', 'skill', 'game'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid interest type' });
+    }
+
+    const posts = await prisma.post.findMany({
+      where: {
+        authorId: userId,
+        interestType: type,
+        interestValue: {
+          equals: decodeURIComponent(value),
+          mode: 'insensitive',
+        },
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+            school: true,
+          },
+        },
+        interests: {
+          select: {
+            id: true,
+            userId: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    res.json({ posts });
+  } catch (error) {
+    console.error('Get user interest posts error:', error);
+    res.status(500).json({ error: 'Failed to get posts' });
+  }
+});
+
 // POST /api/posts - Create new post (protected)
 router.post('/', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { title, description, tags } = req.body;
+    const { title, description, tags, interestType, interestValue, progressSnapshot } = req.body;
 
     // Validation
     if (!title || !title.trim()) {
@@ -136,6 +241,11 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'At least one tag is required' });
     }
 
+    // Validate interest type if provided
+    if (interestType && !['book', 'skill', 'game'].includes(interestType)) {
+      return res.status(400).json({ error: 'Invalid interest type' });
+    }
+
     // Create post
     const post = await prisma.post.create({
       data: {
@@ -143,6 +253,9 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
         description: description?.trim() || null,
         tags,
         authorId: req.user!.userId,
+        interestType: interestType || null,
+        interestValue: interestValue?.trim() || null,
+        progressSnapshot: progressSnapshot || null,
       },
       include: {
         author: {
