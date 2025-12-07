@@ -41,6 +41,12 @@ router.patch('/me', authMiddleware, async (req: Request, res: Response) => {
       openToCofounder,
       openToHelpingOthers,
       status, // legacy
+      // New discovery fields
+      currentBook,
+      currentGame,
+      currentSkill,
+      whatImBuilding,
+      lookingFor,
     } = req.body;
 
     // Validate bio length
@@ -76,6 +82,12 @@ router.patch('/me', authMiddleware, async (req: Request, res: Response) => {
     if (openToCofounder !== undefined) updateData.openToCofounder = openToCofounder;
     if (openToHelpingOthers !== undefined) updateData.openToHelpingOthers = openToHelpingOthers;
     if (status !== undefined) updateData.status = status; // legacy
+    // New discovery fields
+    if (currentBook !== undefined) updateData.currentBook = currentBook;
+    if (currentGame !== undefined) updateData.currentGame = currentGame;
+    if (currentSkill !== undefined) updateData.currentSkill = currentSkill;
+    if (whatImBuilding !== undefined) updateData.whatImBuilding = whatImBuilding;
+    if (lookingFor !== undefined) updateData.lookingFor = lookingFor;
 
     // Update user
     const user = await prisma.user.update({
@@ -122,6 +134,12 @@ router.get('/:id', async (req: Request, res: Response) => {
         collaborationsStarted: true,
         schoolVerified: true,
         status: true, // legacy
+        // New discovery fields
+        currentBook: true,
+        currentGame: true,
+        currentSkill: true,
+        whatImBuilding: true,
+        lookingFor: true,
         createdAt: true,
       },
     });

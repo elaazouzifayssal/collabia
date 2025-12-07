@@ -9,7 +9,8 @@ async function main() {
   // Hash password for fake users
   const hashedPassword = await bcrypt.hash('password123', 10);
 
-  // Fake profiles with specific skills and interests
+  // Fake profiles with specific skills, interests, and discovery fields
+  // NOTE: Some users share the same book/game/skill to test "Same Interests" feature
   const fakeUsers = [
     {
       email: 'sarah.python@collabia.ma',
@@ -23,6 +24,12 @@ async function main() {
       openToCofounder: true,
       openToProjects: true,
       schoolVerified: true,
+      // Discovery fields
+      currentBook: 'Zero to One',
+      currentGame: 'Valorant',
+      currentSkill: 'Machine Learning',
+      whatImBuilding: 'AI-powered study assistant for Moroccan students',
+      lookingFor: 'cofounder',
     },
     {
       email: 'youssef.java@collabia.ma',
@@ -36,6 +43,12 @@ async function main() {
       openToProjects: true,
       openToStudyPartner: true,
       schoolVerified: true,
+      // Discovery fields - same book as Sarah!
+      currentBook: 'Zero to One',
+      currentGame: 'League of Legends',
+      currentSkill: 'System Design',
+      whatImBuilding: 'E-commerce platform for local artisans',
+      lookingFor: 'team',
     },
     {
       email: 'fatima.art@collabia.ma',
@@ -49,6 +62,12 @@ async function main() {
       openToHelpingOthers: true,
       openToProjects: true,
       schoolVerified: true,
+      // Discovery fields - same game as Sarah!
+      currentBook: 'The Design of Everyday Things',
+      currentGame: 'Valorant',
+      currentSkill: 'Motion Design',
+      whatImBuilding: 'Design system for Moroccan startups',
+      lookingFor: 'freelance',
     },
     {
       email: 'mehdi.python@collabia.ma',
@@ -61,6 +80,12 @@ async function main() {
       interests: ['SAAS', 'AI', 'Machine Learning'],
       openToCofounder: true,
       schoolVerified: true,
+      // Discovery fields - same skill as Sarah!
+      currentBook: 'Deep Learning',
+      currentGame: 'CS:GO',
+      currentSkill: 'Machine Learning',
+      whatImBuilding: 'Predictive analytics for agriculture',
+      lookingFor: 'cofounder',
     },
     {
       email: 'leila.uiux@collabia.ma',
@@ -74,6 +99,12 @@ async function main() {
       openToProjects: true,
       openToHelpingOthers: true,
       schoolVerified: true,
+      // Discovery fields
+      currentBook: 'The Design of Everyday Things',
+      currentGame: 'Valorant',
+      currentSkill: 'Figma Advanced',
+      whatImBuilding: 'Design mentorship platform',
+      lookingFor: 'learn',
     },
     {
       email: 'omar.java@collabia.ma',
@@ -87,6 +118,12 @@ async function main() {
       openToCofounder: true,
       openToProjects: true,
       schoolVerified: false,
+      // Discovery fields - same book as Sarah & Youssef!
+      currentBook: 'Zero to One',
+      currentGame: 'FIFA 24',
+      currentSkill: 'Kubernetes',
+      whatImBuilding: 'DevOps automation tool for startups',
+      lookingFor: 'team',
     },
     {
       email: 'imane.art@collabia.ma',
@@ -99,6 +136,12 @@ async function main() {
       interests: ['UI/UX', 'Art', 'Creativity'],
       openToHelpingOthers: true,
       schoolVerified: true,
+      // Discovery fields
+      currentBook: 'Steal Like an Artist',
+      currentGame: 'Valorant',
+      currentSkill: 'Blender 3D',
+      whatImBuilding: 'NFT art collection',
+      lookingFor: 'freelance',
     },
     {
       email: 'amine.python@collabia.ma',
@@ -112,6 +155,12 @@ async function main() {
       openToCofounder: true,
       openToProjects: true,
       schoolVerified: true,
+      // Discovery fields - same skill as Sarah & Mehdi!
+      currentBook: 'The Lean Startup',
+      currentGame: 'League of Legends',
+      currentSkill: 'Machine Learning',
+      whatImBuilding: 'AI chatbot for customer support',
+      lookingFor: 'cofounder',
     },
     {
       email: 'sophia.java@collabia.ma',
@@ -124,6 +173,12 @@ async function main() {
       interests: ['Startups', 'Mobile Dev', 'Entrepreneurship'],
       openToCofounder: true,
       schoolVerified: true,
+      // Discovery fields
+      currentBook: 'The Lean Startup',
+      currentGame: 'Genshin Impact',
+      currentSkill: 'Flutter',
+      whatImBuilding: 'Mobile app for freelancers',
+      lookingFor: 'team',
     },
     {
       email: 'yasmine.uiux@collabia.ma',
@@ -137,10 +192,16 @@ async function main() {
       openToProjects: true,
       openToStudyPartner: true,
       schoolVerified: true,
+      // Discovery fields - same game as Youssef & Amine!
+      currentBook: 'Hooked',
+      currentGame: 'League of Legends',
+      currentSkill: 'User Research',
+      whatImBuilding: 'UX case study platform',
+      lookingFor: 'learn',
     },
   ];
 
-  // Create fake users
+  // Create or update fake users
   for (const userData of fakeUsers) {
     const existingUser = await prisma.user.findUnique({
       where: { email: userData.email },
@@ -152,7 +213,18 @@ async function main() {
       });
       console.log(`✓ Created user: ${userData.name}`);
     } else {
-      console.log(`⊘ User already exists: ${userData.name}`);
+      // Update existing user with new discovery fields
+      await prisma.user.update({
+        where: { email: userData.email },
+        data: {
+          currentBook: userData.currentBook,
+          currentGame: userData.currentGame,
+          currentSkill: userData.currentSkill,
+          whatImBuilding: userData.whatImBuilding,
+          lookingFor: userData.lookingFor,
+        },
+      });
+      console.log(`↻ Updated user with discovery fields: ${userData.name}`);
     }
   }
 

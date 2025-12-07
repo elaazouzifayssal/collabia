@@ -114,6 +114,12 @@ router.get('/users', authMiddleware, async (req: Request, res: Response) => {
         openToHelpingOthers: true,
         lastActiveAt: true,
         schoolVerified: true,
+        // New discovery fields
+        currentBook: true,
+        currentGame: true,
+        currentSkill: true,
+        whatImBuilding: true,
+        lookingFor: true,
       },
     });
 
@@ -687,6 +693,205 @@ router.post('/new-matches/mark-all-seen', authMiddleware, async (req: Request, r
   } catch (error) {
     console.error('Mark all matches seen error:', error);
     res.status(500).json({ error: 'Failed to mark matches as seen' });
+  }
+});
+
+// ============================================
+// SAME INTERESTS DISCOVERY ENDPOINTS
+// ============================================
+
+// GET /api/swipes/same-interests - Get users grouped by same interests (books, games, skills)
+router.get('/same-interests', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const currentUserId = req.user!.userId;
+
+    // Get current user's interests
+    const currentUser = await prisma.user.findUnique({
+      where: { id: currentUserId },
+      select: {
+        currentBook: true,
+        currentGame: true,
+        currentSkill: true,
+      },
+    });
+
+    if (!currentUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const result: {
+      sameBook: { value: string; users: any[] } | null;
+      sameGame: { value: string; users: any[] } | null;
+      sameSkill: { value: string; users: any[] } | null;
+    } = {
+      sameBook: null,
+      sameGame: null,
+      sameSkill: null,
+    };
+
+    const userSelect = {
+      id: true,
+      name: true,
+      email: true,
+      location: true,
+      school: true,
+      bio: true,
+      interests: true,
+      skills: true,
+      currentBook: true,
+      currentGame: true,
+      currentSkill: true,
+      whatImBuilding: true,
+      lookingFor: true,
+      lastActiveAt: true,
+      schoolVerified: true,
+    };
+
+    // Find users with same book
+    if (currentUser.currentBook && currentUser.currentBook.trim() !== '') {
+      const sameBookUsers = await prisma.user.findMany({
+        where: {
+          id: { not: currentUserId },
+          currentBook: {
+            equals: currentUser.currentBook,
+            mode: 'insensitive',
+          },
+        },
+        select: userSelect,
+        take: 20,
+        orderBy: { lastActiveAt: 'desc' },
+      });
+
+      if (sameBookUsers.length > 0) {
+        result.sameBook = {
+          value: currentUser.currentBook,
+          users: sameBookUsers,
+        };
+      }
+    }
+
+    // Find users with same game
+    if (currentUser.currentGame && currentUser.currentGame.trim() !== '') {
+      const sameGameUsers = await prisma.user.findMany({
+        where: {
+          id: { not: currentUserId },
+          currentGame: {
+            equals: currentUser.currentGame,
+            mode: 'insensitive',
+          },
+        },
+        select: userSelect,
+        take: 20,
+        orderBy: { lastActiveAt: 'desc' },
+      });
+
+      if (sameGameUsers.length > 0) {
+        result.sameGame = {
+          value: currentUser.currentGame,
+          users: sameGameUsers,
+        };
+      }
+    }
+
+    // Find users with same skill they're learning
+    if (currentUser.currentSkill && currentUser.currentSkill.trim() !== '') {
+      const sameSkillUsers = await prisma.user.findMany({
+        where: {
+          id: { not: currentUserId },
+          currentSkill: {
+            equals: currentUser.currentSkill,
+            mode: 'insensitive',
+          },
+        },
+        select: userSelect,
+        take: 20,
+        orderBy: { lastActiveAt: 'desc' },
+      });
+
+      if (sameSkillUsers.length > 0) {
+        result.sameSkill = {
+          value: currentUser.currentSkill,
+          users: sameSkillUsers,
+        };
+      }
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Get same interests error:', error);
+    res.status(500).json({ error: 'Failed to get same interests' });
+  }
+});
+
+// GET /api/swipes/same-interests/:type - Get users with same interest by type (book, game, skill)
+router.get('/same-interests/:type', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const currentUserId = req.user!.userId;
+    const { type } = req.params;
+
+    if (!['book', 'game', 'skill'].includes(type)) {
+      return res.status(400).json({ error: 'Type must be book, game, or skill' });
+    }
+
+    const fieldMap: Record<string, string> = {
+      book: 'currentBook',
+      game: 'currentGame',
+      skill: 'currentSkill',
+    };
+
+    const field = fieldMap[type];
+
+    // Get current user's value for this type
+    const currentUser = await prisma.user.findUnique({
+      where: { id: currentUserId },
+      select: { [field]: true },
+    });
+
+    if (!currentUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const currentValue = (currentUser as any)[field];
+
+    if (!currentValue || currentValue.trim() === '') {
+      return res.json({ value: null, users: [] });
+    }
+
+    const users = await prisma.user.findMany({
+      where: {
+        id: { not: currentUserId },
+        [field]: {
+          equals: currentValue,
+          mode: 'insensitive',
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        location: true,
+        school: true,
+        bio: true,
+        interests: true,
+        skills: true,
+        currentBook: true,
+        currentGame: true,
+        currentSkill: true,
+        whatImBuilding: true,
+        lookingFor: true,
+        lastActiveAt: true,
+        schoolVerified: true,
+      },
+      orderBy: { lastActiveAt: 'desc' },
+    });
+
+    res.json({
+      value: currentValue,
+      users,
+    });
+  } catch (error) {
+    console.error('Get same interests by type error:', error);
+    res.status(500).json({ error: 'Failed to get users with same interest' });
   }
 });
 

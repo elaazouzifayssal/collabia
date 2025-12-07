@@ -20,7 +20,20 @@ export default function EditProfileScreen({ navigation }: any) {
   const [location, setLocation] = useState(user?.location || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [school, setSchool] = useState(user?.school || '');
+  // New discovery fields
+  const [currentBook, setCurrentBook] = useState(user?.currentBook || '');
+  const [currentGame, setCurrentGame] = useState(user?.currentGame || '');
+  const [currentSkill, setCurrentSkill] = useState(user?.currentSkill || '');
+  const [whatImBuilding, setWhatImBuilding] = useState(user?.whatImBuilding || '');
+  const [lookingFor, setLookingFor] = useState<'cofounder' | 'team' | 'freelance' | 'learn' | null>(user?.lookingFor || null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const lookingForOptions: { value: 'cofounder' | 'team' | 'freelance' | 'learn'; label: string; emoji: string }[] = [
+    { value: 'cofounder', label: 'Co-founder', emoji: '🚀' },
+    { value: 'team', label: 'Team', emoji: '👥' },
+    { value: 'freelance', label: 'Internship', emoji: '💼' },
+    { value: 'learn', label: 'Learn', emoji: '📚' },
+  ];
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -37,6 +50,12 @@ export default function EditProfileScreen({ navigation }: any) {
         location: location.trim() || undefined,
         bio: bio.trim() || undefined,
         school: school.trim() || undefined,
+        // New discovery fields
+        currentBook: currentBook.trim() || undefined,
+        currentGame: currentGame.trim() || undefined,
+        currentSkill: currentSkill.trim() || undefined,
+        whatImBuilding: whatImBuilding.trim() || undefined,
+        lookingFor: lookingFor || undefined,
       });
 
       updateUser(updatedUser);
@@ -107,6 +126,77 @@ export default function EditProfileScreen({ navigation }: any) {
           placeholder="e.g., ENSA Marrakech"
           editable={!isLoading}
         />
+
+        {/* Now Section - Discovery Fields */}
+        <View style={styles.nowSection}>
+          <Text style={styles.sectionHeader}>Now</Text>
+          <Text style={styles.sectionSubtitle}>
+            Share what you're currently into to connect with like-minded people
+          </Text>
+
+          <Text style={styles.label}>What I'm Building</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={whatImBuilding}
+            onChangeText={setWhatImBuilding}
+            placeholder="Describe what you're currently working on..."
+            multiline
+            numberOfLines={3}
+            editable={!isLoading}
+          />
+
+          <Text style={styles.label}>Book I'm Reading</Text>
+          <TextInput
+            style={styles.input}
+            value={currentBook}
+            onChangeText={setCurrentBook}
+            placeholder="e.g., Zero to One"
+            editable={!isLoading}
+          />
+
+          <Text style={styles.label}>Game I'm Playing</Text>
+          <TextInput
+            style={styles.input}
+            value={currentGame}
+            onChangeText={setCurrentGame}
+            placeholder="e.g., Valorant"
+            editable={!isLoading}
+          />
+
+          <Text style={styles.label}>Skill I'm Learning</Text>
+          <TextInput
+            style={styles.input}
+            value={currentSkill}
+            onChangeText={setCurrentSkill}
+            placeholder="e.g., Machine Learning"
+            editable={!isLoading}
+          />
+
+          <Text style={styles.label}>Looking For</Text>
+          <View style={styles.lookingForContainer}>
+            {lookingForOptions.map((option) => (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.lookingForOption,
+                  lookingFor === option.value && styles.lookingForOptionSelected,
+                ]}
+                onPress={() => setLookingFor(lookingFor === option.value ? null : option.value)}
+                disabled={isLoading}
+              >
+                <Text style={styles.lookingForEmoji}>{option.emoji}</Text>
+                <Text
+                  style={[
+                    styles.lookingForText,
+                    lookingFor === option.value && styles.lookingForTextSelected,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
         <TouchableOpacity
           style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
@@ -203,5 +293,56 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Now section styles
+  nowSection: {
+    marginTop: 32,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  sectionHeader: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 6,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  lookingForContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 8,
+  },
+  lookingForOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    gap: 8,
+  },
+  lookingForOptionSelected: {
+    backgroundColor: '#ede9fe',
+    borderColor: '#8b5cf6',
+  },
+  lookingForEmoji: {
+    fontSize: 18,
+  },
+  lookingForText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  lookingForTextSelected: {
+    color: '#8b5cf6',
   },
 });

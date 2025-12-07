@@ -23,11 +23,18 @@ model User {
   bio       String?  // Short bio (max 150 chars)
   school    String?  // School/University
 
-  // Skills & Interests
+  // Skills & Interests (legacy - keeping for backwards compatibility)
   skills    String[] // Things user knows
   interests String[] // Things user wants to learn
 
-  // Collaboration Preferences
+  // New social/discovery fields
+  currentBook    String?  // Book I'm currently reading
+  currentGame    String?  // Game I'm currently playing
+  currentSkill   String?  // Skill I'm currently learning
+  whatImBuilding String?  // Free text describing what I'm building
+  lookingFor     String?  // "Co-founder" | "Team" | "Freelance" | "Study Partner" | "Just Networking"
+
+  // Collaboration Preferences (legacy - keeping for backwards compatibility)
   openToStudyPartner    Boolean @default(false)
   openToProjects        Boolean @default(false)
   openToAccountability  Boolean @default(false)

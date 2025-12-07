@@ -23,6 +23,12 @@ interface User {
   schoolVerified?: boolean;
   schoolEmail?: string;
   verifiedAt?: string;
+  // New discovery fields
+  currentBook?: string;
+  currentGame?: string;
+  currentSkill?: string;
+  whatImBuilding?: string;
+  lookingFor?: 'cofounder' | 'team' | 'freelance' | 'learn' | null;
 }
 
 interface AuthContextType {

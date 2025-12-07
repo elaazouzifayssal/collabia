@@ -16,6 +16,12 @@ interface User {
   openToHelpingOthers?: boolean;
   lastActiveAt?: string;
   schoolVerified?: boolean;
+  // New discovery fields
+  currentBook?: string;
+  currentGame?: string;
+  currentSkill?: string;
+  whatImBuilding?: string;
+  lookingFor?: 'cofounder' | 'team' | 'freelance' | 'learn' | null;
 }
 
 interface SwipeResult {
@@ -161,4 +167,32 @@ export const swipeService = {
   async markAllMatchesSeen(): Promise<void> {
     await api.post('/api/swipes/new-matches/mark-all-seen');
   },
+
+  // ============================================
+  // SAME INTERESTS DISCOVERY
+  // ============================================
+
+  // Get users grouped by same interests (books, games, skills)
+  async getSameInterests(): Promise<SameInterestsResult> {
+    const response = await api.get('/api/swipes/same-interests');
+    return response.data;
+  },
+
+  // Get users with same interest by type (book, game, skill)
+  async getSameInterestsByType(type: 'book' | 'game' | 'skill'): Promise<SameInterestGroup> {
+    const response = await api.get(`/api/swipes/same-interests/${type}`);
+    return response.data;
+  },
 };
+
+// Same interests types
+interface SameInterestGroup {
+  value: string | null;
+  users: User[];
+}
+
+interface SameInterestsResult {
+  sameBook: SameInterestGroup | null;
+  sameGame: SameInterestGroup | null;
+  sameSkill: SameInterestGroup | null;
+}

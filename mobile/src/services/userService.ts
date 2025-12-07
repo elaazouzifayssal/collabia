@@ -14,6 +14,12 @@ interface UpdateProfileData {
   openToCofounder?: boolean;
   openToHelpingOthers?: boolean;
   status?: string; // legacy
+  // New discovery fields
+  currentBook?: string;
+  currentGame?: string;
+  currentSkill?: string;
+  whatImBuilding?: string;
+  lookingFor?: 'cofounder' | 'team' | 'freelance' | 'learn' | null;
 }
 
 export const userService = {
